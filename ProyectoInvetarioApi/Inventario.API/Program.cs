@@ -1,23 +1,116 @@
+using Inventario.API.Extensions;
+using MediatR;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Inventario.Aplicacion;
+using Inventario.Infraestructura;
+
+using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Configurar Serilog
+Log.Logger = new LoggerConfiguration()
+.ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
 
+builder.Host.UseSerilog();
+
+// Add services to the container.
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.CustomAddOpenApi();
+builder.Services.AddHttpClient();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHealthChecks();
+
+//seguridad
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        });
+});
+
+
+
+//Dependency Injection
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+//builder.Services.AddMediatR(cfg =>
+//{
+//    cfg.RegisterServicesFromAssembly(typeof(CreateOwnertHandler).Assembly);
+
+//});
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0); // versión por defecto v1.0
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+});
+
+
+
+
+builder.Configuration
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 
 var app = builder.Build();
+app.UseCors("AllowAll");
+app.MapHealthChecks("/health");
 
-// Configure the HTTP request pipeline.
+// Manejo global de errores
+app.UseExceptionHandler(appError =>
+{
+    appError.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+
+        var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
+
+        if (exceptionHandlerPathFeature?.Error != null)
+        {
+            var mediator = context.RequestServices.GetRequiredService<IMediator>();
+
+            //var result = await mediator.Send(new CreateErrorCommand()
+            //{
+            //    SeverityID = 5,
+            //    Description = exceptionHandlerPathFeature.Error.ToString(),
+            //    Component = "Transaction.API",
+            //    Date = DateTime.UtcNow.AddHours(-5)
+            //});
+
+            await context.Response.WriteAsJsonAsync(new
+            {
+                Message = "Ocurrió un error inesperado. Por favor, intente nuevamente.",
+            });
+        }
+    });
+});
+
+app.UseAuthentication();
+
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.CustomMapOpenApi();
 }
 
+//app.UseMiddleware<ExceptionMiddleware>();
+
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
