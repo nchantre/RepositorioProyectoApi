@@ -13,10 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Comandos\" />
-    <Folder Include="Hadlers\" />
-    <Folder Include="Consultas\" />
     <Folder Include="Dto\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Inventario.Dominio\Inventario.Dominio.csproj" />
   </ItemGroup>
 
 </Project>

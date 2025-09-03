@@ -1,43 +1,72 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Inventario.Aplicacion.Comandos;
+using Inventario.Aplicacion.Consultas;
+using Inventario.Dominio.Entidades;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace Inventario.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UserController : ControllerBase
+    public class UserController(IMediator mediator) : ControllerBase
     {
-        // GET: api/<UserController>
-        [HttpGet]
-        public IEnumerable<string> Get()
-        {
-            return new string[] { "value1", "value2" };
-        }
+        private readonly IMediator _mediator = mediator;
 
-        // GET api/<UserController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return "value";
-        }
 
         // POST api/<UserController>
         [HttpPost]
-        public void Post([FromBody] string value)
+        public async Task<IActionResult> Post([FromBody] User request)
         {
+            var command = new UserCommand(request);
+            var result = await _mediator.Send(command);
+            if (result)
+                return Ok(result);
+            else
+                return BadRequest(result);
+
         }
+
+
+        // GET: api/<UserController>
+        [HttpGet]
+        public async Task<IEnumerable<User>> Get()
+        {
+            var result = await _mediator.Send( new UserGetAllQuery());
+            return result;
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> Get(string id )
+        {
+            var result = await _mediator.Send(new UserGetByldQuery {  EmployeeNumber = id});
+            return Ok(result);
+        }
+
 
         // PUT api/<UserController>/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        public async Task<IActionResult> Put(string id, [FromBody] UserUpdateCommand value)
         {
+            value.Request.EmployeeNumber = id;
+            var result = await _mediator.Send(value);
+            if (result)
+                return Ok(result);
+            else
+                return BadRequest(result);
+
         }
 
-        // DELETE api/<UserController>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
+       [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
         {
+            var deleted = await _mediator.Send(new UserDeleteCommand { EmployeeNumber = id });
+
+            if (!deleted)
+                return NotFound($"No se encontró el propietario con Id = {id}");
+
+            return Ok(new User { EmployeeNumber = id });
         }
+
     }
 }
