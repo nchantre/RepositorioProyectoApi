@@ -1,0 +1,130 @@
+﻿@page "/users/new"
+@page "/users/edit/{EmployeeNumber}"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using AppInventario.Models
+@inject AppInventario.Services.UsersClient Api
+@inject NavigationManager Nav
+
+<h3>@(IsEdit ? "Editar usuario" : "Nuevo usuario")</h3>
+
+@if (loading)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Employee Number</label>
+                <InputText class="form-control" @bind-Value="model.EmployeeNumber" disabled="@IsEdit" />
+                <ValidationMessage For="() => model.EmployeeNumber" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Name</label>
+                <InputText class="form-control" @bind-Value="model.Name" />
+                <ValidationMessage For="() => model.Name" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Apellido Paterno</label>
+                <InputText class="form-control" @bind-Value="model.Ap" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Apellido Materno</label>
+                <InputText class="form-control" @bind-Value="model.Am" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">UserName</label>
+                <InputText class="form-control" @bind-Value="model.UserName" />
+                <ValidationMessage For="() => model.UserName" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Access Key</label>
+                <InputText class="form-control" @bind-Value="model.AccessKey" />
+                <ValidationMessage For="() => model.AccessKey" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Position</label>
+                <InputText class="form-control" @bind-Value="model.Position" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Department</label>
+                <InputText class="form-control" @bind-Value="model.Department" />
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="alert alert-danger mt-3">@error</div>
+        }
+
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Guardar</button>
+            <button class="btn btn-secondary" type="button" @onclick="Back">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string? EmployeeNumber { get; set; }
+
+    private UserDto model = new();
+    private bool loading = true;
+    private string? error;
+
+    private bool IsEdit => !string.IsNullOrWhiteSpace(EmployeeNumber);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+
+        if (IsEdit)
+        {
+            var data = await Api.GetByIdAsync(EmployeeNumber!);
+            if (data is null)
+            {
+                error = "Usuario no encontrado.";
+                model = new UserDto { EmployeeNumber = EmployeeNumber! };
+            }
+            else
+            {
+                model = data;
+            }
+        }
+        else
+        {
+            model = new UserDto();
+        }
+
+        loading = false;
+    }
+
+    async Task SaveAsync()
+    {
+        (bool ok, string? err) result;
+
+        if (IsEdit)
+            result = await Api.UpdateAsync(model);
+        else
+            result = await Api.CreateAsync(model);
+
+        if (!result.ok)
+        {
+           
+            //error = result.Error ?? "No se pudo guardar.";
+            return;
+        }
+
+        Back();
+    }
+
+    void Back() => Nav.NavigateTo("/users");
+}
+
+

@@ -1,0 +1,111 @@
+﻿@page "/users"
+@rendermode InteractiveServer
+@using AppInventario.Models
+@inject AppInventario.Services.UsersClient Api
+@inject NavigationManager Nav
+
+<h3 class="mb-3">Usuarios</h3>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("users/new")'>➕ Nuevo</button>
+</div>
+
+@if (loading)
+{
+    <p>Cargando...</p>
+}
+else if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (users.Count == 0)
+{
+    <p>No hay usuarios.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Emp. #</th>
+                <th>Nombre</th>
+                <th>Usuario</th>
+                <th>Departamento</th>
+                <th>Puesto</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in users)
+            {
+                <tr>
+                    <td>@u.EmployeeNumber</td>
+                    <td>@($"{u.Name} {u.Ap} {u.Am}".Trim())</td>
+                    <td>@u.UserName</td>
+                    <td>@u.Department</td>
+                    <td>@u.Position</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-secondary me-2" @onclick="() => Edit(u.EmployeeNumber)">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(u)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- Modal de confirmación simple -->
+@if (toDelete is not null)
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center">
+        <span>¿Eliminar al usuario <strong>@toDelete.EmployeeNumber</strong>?</span>
+        <span>
+            <button class="btn btn-sm btn-danger me-2" @onclick="ConfirmDelete">Sí, eliminar</button>
+            <button class="btn btn-sm btn-secondary" @onclick="() => toDelete = null">Cancelar</button>
+        </span>
+    </div>
+}
+
+@code {
+    private List<UserDto> users = new();
+    private bool loading = true;
+    private string? error;
+    private UserDto? toDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            users = await Api.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    void Edit(string employeeNumber) => Nav.NavigateTo($"/users/edit/{Uri.EscapeDataString(employeeNumber)}");
+
+    void AskDelete(UserDto u) => toDelete = u;
+
+    async Task ConfirmDelete()
+    {
+        if (toDelete is null) return;
+
+        var (ok, err) = await Api.DeleteAsync(toDelete.EmployeeNumber);
+        if (!ok)
+        {
+            error = err ?? "No se pudo eliminar.";
+            toDelete = null;
+            return;
+        }
+
+        users.RemoveAll(x => x.EmployeeNumber == toDelete.EmployeeNumber);
+        toDelete = null;
+        StateHasChanged();
+    }
+}
